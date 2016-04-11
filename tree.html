@@ -36,11 +36,8 @@ div.left
  position:absolute;
  left:0;
  top:0;
- width:140px;
- margin:0;
- padding:1em;
- background-color:lightgray;
-
+ width:200px;
+ padding: 1.5em;
 }
 div.content
 {
@@ -53,46 +50,48 @@ div.content
 <script type="text/javascript" src="jscolor/jscolor.js"></script>
 <script type="text/javascript" src="./bintree/treecore.js"></script>
 <script type="text/javascript" src="./bintree/bintreeviz.js"></script>
+
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap.min.css" integrity="sha384-1q8mTJOASx8j1Au+a5WDVnPi2lkFfwwEAa8hDDdjZlpLegxhjVME1fgjWPGmkzs7" crossorigin="anonymous">
+
 </head>
 
 <body>
 <div clas="innercontainer">
-<div class="left" id="controlPanel">
+<div class="panel panel-default left" id="controlPanel">
 <h3 align="center">Control Panel</h3>
   <h4 align="center">
-Traversals<p>
-  <a onMouseover="document.getElementById('post_buttonimg').src=eval('post_cacheonimg.src')"
+Traversals
+
+<p><a class="btn btn-default" onMouseover="document.getElementById('post_buttonimg').src=eval('post_cacheonimg.src')"
   onMouseout="document.getElementById('post_buttonimg').src=eval('post_cacheoffimg.src')"
-  onclick="showPostorder()">
-  <img src="./buttons/button_postorder0.png" id="post_buttonimg" alt="Postorder"/></a>
-  <p>
+  onclick="showPostorder()">Postorder</a></p>
 
-   <a onMouseover="document.getElementById('in_buttonimg').src=eval('in_cacheonimg.src')"
+  <p><a class="btn btn-default" onMouseover="document.getElementById('in_buttonimg').src=eval('in_cacheonimg.src')"
   onMouseout="document.getElementById('in_buttonimg').src=eval('in_cacheoffimg.src')"
-  onclick="showInorder()">
-  <img src="./buttons/button_inorder0.png" id="in_buttonimg" alt="Inorder"/></a>
-  <p>
+  onclick="showInorder()">Inorder</a></p>
 
-   <a onMouseover="document.getElementById('pre_buttonimg').src=eval('pre_cacheonimg.src')"
+  <p><a class="btn btn-default" onMouseover="document.getElementById('pre_buttonimg').src=eval('pre_cacheonimg.src')"
   onMouseout="document.getElementById('pre_buttonimg').src=eval('pre_cacheoffimg.src')"
-  onclick="showPreorder()">
-  <img src="./buttons/button_preorder0.png" id="pre_buttonimg" alt="Preorder"/></a>
-  <p>
+  onclick="showPreorder()">Preorder</a></p>
+
 <hr>
-  <a onMouseover="document.getElementById('cl_buttonimg').src=eval('cl_cacheonimg.src')"
+
+  <p><a class="btn btn-default" onMouseover="document.getElementById('cl_buttonimg').src=eval('cl_cacheonimg.src')"
   onMouseout="document.getElementById('cl_buttonimg').src=eval('cl_cacheoffimg.src')"
-  onclick="clearTree()">
-  <img src="./buttons/button_clear0.png" id="cl_buttonimg" alt="Clear heap"/></a>
-  
+  onclick="clearTree()">Clear</a></p>
+
 <hr>
-  Node Color: <input value="8090A0" class="color {onImmediateChange:'updateInfo(this);'}">
-  Node Text Color: <input value="000000" class="color {onImmediateChange:'updateTxt(this);'}"><p>
+  <div class="input-group">
+  Node Color: <input value="8090A0" class="form-control color {onImmediateChange:'updateInfo(this);'}">
+  Node Text Color: <input value="000000" class="form-control color {onImmediateChange:'updateTxt(this);'}"><p>
   Zoom:
-  <input type="range" min="-50" max="50" value="0" step="1" onchange="showValue(this.value)" />
-<span id="range">0</span>
+  <input type="range" min="-50" max="50" value="0" step="1" onchange="showValue(this.value)" class="form-control"/>
+  <span id="range">0</span>
+  </div>
 <h3 align="center">
 <a title="Click a node to highlight it.&#10;  Clicking a highlighted node deletes it and its children&#10;  Start typing when a node is highlighted to change its label.  Hit Enter or click a blank area when done.&#10;Click a node a drag down to the left to add a left child.&#10;Click a node and drag down the to the right to add a right child." href='./treehelp.html' target="_blank"><img width=35 src="./buttons/Help-icon.png"></a></h3>
 </div>
+
 <div class="content" id="myContent">
 <canvas id="myCanvas" tabindex="0"></canvas>
 </div>
@@ -145,7 +144,7 @@ BinaryTree.prototype.leftClick = function(x,y) {
       typing = false;
       firstClickedNode.color = nodeColor;
       firstClickedNode = undefined;
-      return;      
+      return;
     }
   }
   // A node was clicked
@@ -161,7 +160,7 @@ BinaryTree.prototype.leftClick = function(x,y) {
 	  return;
 	}
 	// else it was a different node so unhighlight and select new node
-	else { 
+	else {
 	  firstClickedNode.color = nodeColor;
 	  firstClickedNode = clickedNode;
 	  typing = false;
@@ -179,7 +178,7 @@ BinaryTree.prototype.leftClick = function(x,y) {
 }
 
 // Displays a post-order traversal of the tree in an alert box.
-// This could be made more fancy.  
+// This could be made more fancy.
 function showPostorder() {
   var count = 0;
   output = "Post-order traversal: ";
@@ -195,7 +194,7 @@ function showPostorder() {
 }
 
 // Displays an in-order traversal of the tree in an alert box.
-// This could be made more fancy. 
+// This could be made more fancy.
 function showInorder() {
   var count = 0;
   var output = "In-order traversal: ";
@@ -209,7 +208,7 @@ function showInorder() {
 }
 
 // Displays an pre-order traversal of the tree in an alert box.
-// This could be made more fancy. 
+// This could be made more fancy.
 function showPreorder() {
   var count = 0;
   output = "Pre-order traversal: ";
@@ -246,10 +245,10 @@ HTMLCanvasElement.prototype.relMouseCoords = relMouseCoords;
 
 window.onload = window.onresize = function() {
   var C = .95;
-  
+
   var windowHeight = window.innerHeight;
   var windowWidth = window.innerWidth;
- 
+
   //document.getElementById('myContent').setAttribute("style","display:block;height:"+
   //						    windowHeight - 100);
   //document.getElementById('myContent').setAttribute("style","display:block;width:"+
