@@ -1,0 +1,887 @@
+.  A basic graph <!DOCTYPE HTML>
+<html> <head>
+<title></title>
+<style>
+body {
+margin: 0px;
+padding: 0px;
+}
+div.container
+{
+width:100%;
+margin:0px;
+border:1px solid gray;
+line-height:150%;
+}
+div.innercontainer
+{
+ width:100%;
+ margin:0px;
+ position:relative;
+}
+div.header,div.footer
+{
+padding:0.1em;
+color:white;
+background-color:gray;
+clear:left;
+}
+h1.header
+{
+padding:0;
+margin:0;
+}
+div.left
+{
+ position:absolute;
+ left:0;
+ top:0;
+ width:140px;
+ margin:0;
+ padding:1.5em;
+ background-color:lightgray;
+}
+div.content
+{
+ padding:0;
+ position:absolute;
+ left:190px;
+ top:0px;
+}
+</style>
+<script type="text/javascript" src="jscolor/jscolor.js"></script>
+</head>
+
+<body>
+<div clas="innercontainer">
+<div class="left" id="controlPanel">
+<h3 align="center">Control Panel</h3>
+  <h4 align="center"?
+ <a onMouseover="document.getElementById('cl_buttonimg').src=eval('cl_cacheonimg.src')"
+ onMouseout="document.getElementById('cl_buttonimg').src=eval('cl_cacheoffimg.src')"
+ onclick="clearGraph()">
+<img src="./buttons/button_clear0.png" id="cl_buttonimg" alt="Clear heap"/></a>
+</h4>
+Node Color: <input value="8090A0" class="color {onImmediateChange:'updateInfo(this);'}">
+Node Text Color: <input value="000000" class="color {onImmediateChange:'updateTxt(this);'}"><p>
+Zoom:
+<input type="range" min="-50" max="50" value="0" step="1" onchange="showValue(this.value)" />
+<span id="range">0</span><hr>
+Graph Type:<br>
+<input type="radio" name="graphtype" value="undirected" onclick="setUndirected()" checked>Undirected<br>
+<input type="radio" name="graphtype" value="directed" onclick="setDirected()">Directed<br>
+<h3 align="center">
+<a title="Double-click blank area to create a node. &#10;Click an existing node to highlight it.&#10;   Click a highlighted node to delete it.&#10;   Start typing when a node is highlighted to change its label.  Hit Enter or click a blank area when done.&#10;   Click a different node when a node is highlighed to create an edge between the nodes.&#10;Click an edge to highlight it.&#10;   Click a highlighted edge to delete it.&#10;   Start typing when an edge is highlighted to give it a weight (numbers only).   Hit Enter or click a blank area when done.&#10;Click and drag a node to move it." href='./graphhelp.html' target="_blank"><img width=35 src="./buttons/Help-icon.png"></a></h3>
+</div>
+<div class="content" id="myContent">
+<canvas id="myCanvas" tabindex="0"></canvas>
+</div>
+</div>
+
+
+<script>
+var cl_cacheonimg = new Image ();
+var cl_cacheoffimg = new Image ();
+cl_cacheonimg.src = './buttons/button_clear1.png';
+cl_cacheoffimg.src = './buttons/button_clear0.png';
+
+function NodeData(d) {
+  this.data = d;
+  this.color = nodeColor;
+  this.special = 'none';
+  this.zoom = 1;
+  this.centerX = 0;
+  this.centerY = 0;
+  this.aux = undefined;  // Add app specific information here;
+ };
+
+// This the basic graph functionality.  Visual elements are added
+// via prototyping.  A graph is either directed or undirected
+
+function Graph(dir) {
+/**
+* Array for nodes and edge matrix
+*/
+  this.nodes = new Array();
+  this.edges = new Array();
+  this.directed = dir;
+  this.numNodes = 0;
+
+  this.addNode = function(data) {
+    var newNode = new NodeData(data);
+    this.nodes.push(newNode);
+    this.edges[this.numNodes] = new Array();
+    this.numNodes++;
+    return newNode;
+  }
+
+  this.nodeIndex = function(node) {
+    for(var i=0;i<this.nodes.length;i++)
+      if (this.nodes[i] == node) return i;
+    return -1;
+  }
+
+  // addEdge will do the right thing based on this.directed
+  // Only non-negative edge weights are allowed.  If weight is not set, it is
+  // assumed that this is an unweighted graph and the weight value is set to undefined.
+  // If the edge already exists it is assumed that the weight is being updated
+  // no error is generated, and the edge weight is changed to the new value.
+  this.addEdge = function(nodeFrom, nodeTo, weight) {
+    indexFrom = this.nodeIndex(nodeFrom);
+    indexTo = this.nodeIndex(nodeTo);
+    if (!weight) weight = {weight:undefined,color:'black'}; 
+    if (indexFrom == -1 || indexTo == -1)  {
+      alert("Something has gone horribly horribly wrong");
+      return;
+    }
+    if (this.edges[indexFrom][indexTo]) return;  // If edge already exists, do nothing.
+    this.edges[indexFrom][indexTo] = weight;
+    if (!this.directed)  // Undirected graph
+      this.edges[indexTo][indexFrom] = weight;
+  }
+
+  // This is ugly.  Basically we are just setting the node to undefined
+  // and clearing out it's edges.  Renderers need to check for undefined nodes.
+  this.deleteNode = function(node) {
+    index = this.nodeIndex(node);
+    if (index == -1) {
+      alert("Something has gone horribly horribly wrong");
+      return;
+    }
+    for(var i=0;i<this.nodes.length;i++)
+      if(this.edges[i])
+	this.edges[i][index] = undefined;
+    this.edges[index] = undefined;
+    this.nodes[index] = undefined;
+  }
+
+  // To delete an edge we simply set it's entry in the table to undefined.    
+  this.deleteEdge = function(toNode, fromNode) {
+    toIndex = this.nodeIndex(toNode);
+    fromIndex = this.nodeIndex(fromNode);
+    if (this.edges[toIndex])
+      this.edges[toIndex][fromIndex] = undefined;
+    if (!this.directed && this.edges[fromIndex])
+      this.edges[fromIndex][toIndex] = undefined;
+  }
+};
+
+Graph.prototype.distanceToLine = function(x1,y1,x2,y2,x0,y0) {
+  var A=(y1-y2);
+  var B=(x2-x1);
+  var C=(x1*y2 - x2*y1);
+  var distance = Math.abs(A*x0 + B*y0 + C)/Math.sqrt(A*A+B*B);
+  return distance;
+}
+
+// Given canvas X, Y coordinates, return the node the user clicked on.
+// If no node was clicked, return undefined.
+Graph.prototype.findNode = function(x,y,radius) {
+  for(var i=this.nodes.length-1;i>=0;i--) {    
+    if (this.nodes[i]) {
+      if (Math.pow(x-this.nodes[i].centerX,2) + Math.pow(y - this.nodes[i].centerY,2) <
+	  Math.pow(radius,2))
+	return this.nodes[i];
+    }
+  }
+  return undefined;
+}; 
+
+// Given canvas X, Y coordinates, return the edge the user clicked on.
+// If no edge was clicked, return undefined.  
+Graph.prototype.findEdge = function(x,y) {  
+  var maxdist = 3;
+  for(var i=0;i<this.nodes.length;i++) {    
+    if (this.nodes[i]) {
+      if (this.edges[i]) {
+	for(var j=0;j<this.nodes.length;j++)
+	  if (this.edges[i][j]) {
+	      if(!this.directed) {
+		  var x1 = this.nodes[i].centerX;
+		  var x2 = this.nodes[j].centerX;
+		  var y1 = this.nodes[i].centerY;
+		  var y2 = this.nodes[j].centerY;
+		  if (this.distanceToLine(x1,y1,x2,y2,x,y) <= maxdist &&
+		      ((x <= x1 && x>=x2) || (x >= x1 && x <= x2)) &&
+		      ((y <= y1 && y>=y2) || (y >= y1 && y <= y2)))
+		      return {fromNode:this.nodes[i], toNode:this.nodes[j], weight:this.edges[i][j]};
+	      }
+	      else {
+		  var x1 = this.nodes[i].centerX;
+		  var x2 = this.nodes[j].centerX;
+		  var y1 = this.nodes[i].centerY;
+		  var y2 = this.nodes[j].centerY;
+		  var theta = Math.atan2(y1-y2, x1 - x2) -.1;
+		  var x3 = x1 + radius * Math.cos(theta);
+		  var y3 = y1 + radius * Math.sin(theta);
+		  var theta = Math.atan2(y2-y1, x2 - x1) +.1;
+		  var x4 = x2 + radius * Math.cos(theta);
+		  var y4 = y2 + radius * Math.sin(theta);
+		  if (this.distanceToLine(x3,y3,x4,y4,x,y) <= maxdist &&
+		      ((x <= x3 && x>=x4) || (x >= x3 && x <= x4)) &&
+		      ((y <= y3 && y>=y4) || (y >= y3 && y <= y4)))
+		      return {fromNode:this.nodes[i], toNode:this.nodes[j], weight:this.edges[i][j]};
+	      }
+	  }
+      }
+    }
+  }
+  return undefined;
+}; 
+
+// Display a single graph node on the canvas
+Graph.prototype.displayNode = function(context,node,radius) {
+  if (!node) return;
+  context.beginPath();
+  context.arc(node.centerX, node.centerY, radius, 0, 2 * Math.PI, false);
+  context.fillStyle = node.color;
+  context.fill();
+  context.lineWidth = 2;
+  context.strokeStyle = '#003300';
+  context.stroke();
+  context.beginPath();
+  context.font = ""+radius+'pt Calibri';
+  context.fillStyle = txtColor;
+  var metrics = context.measureText(node.data);
+  var pointsize = radius;
+  var width = metrics.width
+  while (width > radius*2-3  && pointsize > 10) {
+    pointsize--;
+    context.font = ""+pointsize+'pt Calibri';
+    metrics = context.measureText(node.data);
+    width = metrics.width;
+  }
+  context.fillText(node.data,node.centerX-(width/2),node.centerY+pointsize/2);
+  context.stroke()
+};
+  
+    
+// Display the outgoing edges from a given node
+// This does not deal with the line starting at the edge of the circle (for undirected edges)
+// Instead it assumes the edges will be displayed first and then the nodes
+// will be displayed on top of them.  Cheezy, but it works.  Code for
+// directed edges does find the intersection of the edge with the node.
+Graph.prototype.displayEdges = function(context,node,radius) { 
+    if (!node) return;
+    var index = this.nodeIndex(node);  // Index of current node
+    context.lineWidth = 2;
+    for(var i=0;i<this.edges[index].length;i++) {
+	if (this.edges[index][i]) {
+	    context.beginPath();
+	    context.strokeStyle = this.edges[index][i].color;
+	    context.moveTo(node.centerX,node.centerY);
+	    if (!this.directed) {
+		context.lineTo(this.nodes[i].centerX,this.nodes[i].centerY); }
+	    else {
+		var theta = Math.atan2(this.nodes[i].centerY-node.centerY, this.nodes[i].centerX - node.centerX) +.1;
+		var x3 = node.centerX + radius * Math.cos(theta);
+		var y3 = node.centerY + radius * Math.sin(theta);
+		var theta = Math.atan2(node.centerY - this.nodes[i].centerY, node.centerX - this.nodes[i].centerX) - .1;
+		var x4 = this.nodes[i].centerX + radius * Math.cos(theta);
+		var y4 = this.nodes[i].centerY + radius * Math.sin(theta);
+		drawArrow(context,x3,y3,x4,y4);
+	    }
+	    context.stroke();
+	    if (this.edges[index][i].weight!=undefined) {
+		var p1 = {x:this.nodes[i].centerX, y:this.nodes[i].centerY};
+		var p2 = {x:node.centerX, y:node.centerY};
+		var dx = p2.x - p1.x;
+		var dy = p2.y - p1.y;
+		var angle = Math.atan2(dy,dx);
+		var offset = -10; // some % of font size;
+		if (angle < -Math.PI/2 || angle > Math.PI/2){
+		    var p = p1;
+		    p1 = p2;
+		    p2 = p;
+		    dx *= -1;
+		    dy *= -1;
+		    angle -= Math.PI;
+		    offset = 40; // some % of font size?
+		}
+		if (!this.directed) { offset = -4; }
+		context.beginPath();
+		context.save();
+		context.textAlign = 'center';
+		context.font = ""+radius/2+'pt Calibri';
+		context.translate(p1.x+dx*.5,p1.y+dy*.5);
+		context.rotate(angle);
+		context.fillStyle = 'black';
+		context.fillText(this.edges[index][i].weight,0,offset);
+		context.restore();
+		context.stroke();
+	    }
+    }
+  }
+};
+
+Graph.prototype.updateColor = function(newColor)
+{
+  for(var i=0;i<this.nodes.length;i++) 
+    if(this.nodes[i]) this.nodes[i].color = newColor;
+}
+
+// Increase or decrease the x and y values of the center of each
+// node by some percentage.
+Graph.prototype.scaleGraph = function(xscale, ysacle) {
+  for(var i=0;i<this.nodes.length;i++) {
+    if(this.nodes[i]) {
+      this.nodes[i].centerX = this.nodes[i].centerX + this.nodes[i].centerX*xscale;
+      this.nodes[i].centerY = this.nodes[i].centerY + this.nodes[i].centerY*xscale;
+    }
+  }
+};
+
+// Display the entire graph
+Graph.prototype.renderGraph = function(context) {
+  context.clearRect(0, 0, canvas.width, canvas.height);
+    // Render edges first
+  for(var i=0;i<this.nodes.length;i++)
+    this.displayEdges(context,this.nodes[i], radius);
+    // Render the nodes
+  for(var i=0;i<this.nodes.length;i++)
+    this.displayNode(context,this.nodes[i], radius);
+};
+
+// This function does the right thing when the user clicks on the canvas.
+// Double-clicking on unocuppied space creates a new node.
+// Single clicking on a node/edge highlights that node or edge.
+// When a node is highlighted, typing changes that label for that node.  End with Enter
+// If a node is highlighted and another node is clicked, an edge is created from
+// the highlighted node to the clicked node.  Clicking a second time on a highlighted
+// node deletes that node and all its edges.  Clicking empty space when a node/edge
+// is highlighed, unhilights that node/edge.  Clicking on a highlighted edge, deletes
+// that edge.  Typing when an edge is highligted (numbers 0-9) enters a weight for
+// that edge.
+var firstClickedNode;
+var firstClickedEdge;
+var firstClickX, firstClickY;
+var typing;
+var nodeNumber = 0;
+
+Graph.prototype.highlightEdge = function(e) {
+  if (e) {
+    e.weight.color = 'green';
+    typing = false;
+  }
+}
+
+Graph.prototype.unhighlightEdge = function(e) {
+  if (e) {
+    e.weight.color = 'black';
+    typing = false;
+  }
+}
+
+Graph.prototype.highlightNode = function(n) {
+  if (n) {
+    typing = false;
+    var highlightColor = (0xffffff - parseInt('0x'+nodeColor.substring(1))).toString(16);
+    var pad = "000000";
+    var result = (pad+highlightColor).slice(-pad.length);
+    n.color = '#'+result;
+  }
+}
+
+Graph.prototype.unhighlightNode = function(n) {
+  if (n) {
+    typing = false;
+    n.color = nodeColor;
+  }
+}
+
+Graph.prototype.leftClick = function(x, y) {
+  var clickedNode = this.findNode(x,y,radius);
+  var clickedEdge;
+  if (!clickedNode) {
+    clickedEdge = this.findEdge(x,y); }
+  if (!clickedNode && !clickedEdge) {
+    //Unocuppied space was clicked
+    // A node had been selected.  Unhighlight and move on
+    typing = false;
+    if (firstClickedNode) {
+      this.unhighlightNode(firstClickedNode);
+      firstClickedNode = undefined;
+      return; }
+    // An edge had been selected.  Unhighlight edge and move on
+    if (firstClickedEdge) {
+      this.unhighlightEdge(firstClickedEdge);
+      firstClickedEdge = undefined;
+      return;
+    }
+    // Nothing was selected check to see if this is the first click
+    // Is this the second click?
+    if (firstClickX) {
+      // double click
+      if (Math.abs(x-firstClickX) <=2 && Math.abs(y-firstClickY) <= 2)
+	{
+	  //  If we get here the user double-clicked the same empty space
+	  //  so create a new node centered in that location.
+	  var myNode = this.addNode(nodeNumber);
+	  nodeNumber++;
+	  myNode.centerX = x;
+	  myNode.centerY = y;
+	}
+      firstClickX = firstClickY = undefined;
+      return;
+    }
+    else {
+      firstClickX = x;
+      firstClickY = y;
+      return
+    }
+  }
+  // A node was clicked
+  if (clickedNode)
+    {
+      // This is the second node to be clicked.  See if it is the same or different
+      // from the first node that was clicked.
+      if (firstClickedEdge) {
+	this.unhighlightEdge(firstClickedEdge);
+	firstClickedEdge = undefined;
+      }
+      if (firstClickedNode) {
+	if (clickedNode == firstClickedNode) {
+	  //  The user clicked the same node twice so, delete it.
+	  graph.deleteNode(clickedNode);
+	  firstClickedNode = undefined; 
+	  return;
+	}
+	else {
+          // The user clicked two different nodes, so add an edge between them.
+	  this.unhighlightNode(firstClickedNode);
+	  this.addEdge(firstClickedNode,clickedNode,{weight:undefined,color:'black'});
+	  firstClickedNode = undefined;
+	  return;
+	}
+      }
+      // This is the first node clicked, so highlight it.
+      else {
+	firstClickedNode = clickedNode;
+	this.highlightNode(clickedNode);
+	return;
+      }
+    }
+  // An edge was clicked
+  if (clickedEdge) {
+    if (firstClickedNode) {
+      this.unhighlightNode(firstClickedNode);
+      firstClickedNode = undefined;
+    }
+    // Check to see if the edge had already been selected.  If it is a different
+    // edge than first selected, simply unselect the edge.
+    if (firstClickedEdge) {
+      if (clickedEdge.fromNode == firstClickedEdge.fromNode &&
+	  clickedEdge.toNode == firstClickedEdge.toNode) {
+	  // User clicked the same edge twice so delete it.
+	this.deleteEdge(clickedEdge.fromNode, clickedEdge.toNode);
+	firstClickedEdge = undefined;
+	return;
+      }
+      else {
+	this.unhighlightEdge(firstClickedEdge);
+	firstClickedEdge = clickedEdge;
+	this.highlightEdge(firstClickedEdge);
+      }
+    }
+    else {
+      firstClickedEdge = clickedEdge;
+      this.highlightEdge(firstClickedEdge);
+      return;
+    }
+  }
+};
+
+var canvas = document.getElementById('myCanvas');
+var canvasWidth;
+var canvasHeight;
+var radius;
+var graph = new Graph(false);  // directed graph
+var context;
+var dragging = false;
+var selection = null;
+var dragoffx = 0;
+var dragoffy = 0;
+var moved = false;
+var zoomFactor = 0;
+var directed = false;
+
+//fixes a problem where double clicking causes text to get selected on the canvas
+canvas.addEventListener('selectstart', function(e) { e.preventDefault(); return false; }, false);
+// Up, down, and move are for dragging
+canvas.addEventListener('mousedown', function(e) {
+    var coords = canvas.relMouseCoords(e);
+    var canvasX = coords.x;
+    var canvasY = coords.y;
+    var clickedNode = graph.findNode(canvasX,canvasY,radius);
+    if (clickedNode) {
+      selection = clickedNode;
+      dragoffx = canvasX - clickedNode.centerX;
+      dragoffy = canvasY - clickedNode.centerY;
+      dragging = true;
+      //selection.color = 'yellow';
+    }
+    else {
+      //if(selection!=null) {
+      //selection.color = 'orange';
+      //}
+      selection = null;
+    }
+    moved = false;
+    graph.renderGraph(context);
+  }, false);
+
+canvas.addEventListener('mousemove',function(e) {
+    if (dragging) {
+      var coords = canvas.relMouseCoords(e);
+      var canvasX = coords.x;
+      var canvasY = coords.y;
+      selection.centerX = canvasX - dragoffx;
+      selection.centerY = canvasY - dragoffy;
+      graph.renderGraph(context);
+      graph.displayNode(context,selection,radius);
+    }
+    moved=true;
+  }, false);
+
+canvas.addEventListener('mouseup', function(e) {
+    if (!moved) {
+      var coords = canvas.relMouseCoords(e);
+      var canvasX = coords.x;
+      var canvasY = coords.y;
+      graph.leftClick(canvasX, canvasY);
+      graph.renderGraph(context);
+    }
+    dragging = false;
+    moved = false;
+    selection = undefined;
+  }, false);
+
+canvas.addEventListener('keypress', function(e) {
+    if (firstClickedNode) {
+      if (e.which == 13)
+	{
+	  typing = false;
+	  firstClickedNode.color = nodeColor;
+	  firstClickedNode = undefined;
+	}
+      else {
+	if (!typing) {
+	  firstClickedNode.data = String.fromCharCode(e.which);
+	  typing = true;
+	}
+	else {
+	  firstClickedNode.data += String.fromCharCode(e.which);
+	}
+      }
+    }
+    if (firstClickedEdge) {
+      if (e.which == 13)
+	{
+	  typing = false;
+	  firstClickedEdge.weight.color = 'black';
+	  firstClickedEdge.weight.weight = parseFloat(firstClickedEdge.weight.weight);
+	  firstClickedEdge = undefined;
+	}
+      else {
+	if (!typing) {
+	  firstClickedEdge.weight.weight =String.fromCharCode(e.which);
+	  typing = true;
+	}
+	else {
+	  firstClickedEdge.weight.weight += String.fromCharCode(e.which);
+	}
+      }
+    }
+    graph.renderGraph(context);
+  }, false);
+
+function clearGraph() {
+  graph = new Graph(directed);
+  context.clearRect(0, 0, canvas.width, canvas.height);
+}
+
+function setUndirected() { directed = false; }
+function setDirected() { directed = true; }
+
+function relMouseCoords(event){
+    var totalOffsetX = 0;
+    var totalOffsetY = 0;
+    var canvasX = 0;
+    var canvasY = 0;
+    var currentElement = this;
+
+    do{
+        totalOffsetX += currentElement.offsetLeft - currentElement.scrollLeft;
+        totalOffsetY += currentElement.offsetTop - currentElement.scrollTop;
+    }
+    while(currentElement = currentElement.offsetParent)
+
+    canvasX = event.pageX - totalOffsetX;
+    canvasY = event.pageY - totalOffsetY;
+
+    return {x:canvasX, y:canvasY}
+}
+HTMLCanvasElement.prototype.relMouseCoords = relMouseCoords;
+
+window.onload = window.onresize = function() {
+  var C = .95;
+  
+  var windowHeight = window.innerHeight;
+  var windowWidth = window.innerWidth;
+  var oldCanvasWidth;
+  var oldCanvasHeight;
+  
+  //document.getElementById('myContent').setAttribute("style","display:block;height:"+
+  //						    windowHeight - 100);
+  //document.getElementById('myContent').setAttribute("style","display:block;width:"+
+  //						    windowWidth - 140);
+  if (canvasWidth) {
+    oldCanvasHeight = canvasHeight;
+    oldCanvasWidth = canvasWidth;
+  }
+  canvasWidth = (windowWidth-140) * C;
+  canvasHeight = windowHeight * C;
+  canvas.setAttribute("width", canvasWidth);
+  canvas.setAttribute("height", canvasHeight);
+  radius = canvasWidth/20*(1+zoomFactor/100);
+  window.ctx = canvas.getContext("2d");
+  context = window.ctx;
+  if (oldCanvasHeight) 
+    graph.scaleGraph((canvasWidth-oldCanvasWidth)/oldCanvasWidth,
+		     (canvasHeight-oldCanvasHeight)/oldCanvasHeight);
+  graph.renderGraph(context);
+  return;
+};
+var nodeColor = "#8090A0";
+var txtColor = "#000000";
+
+function updateInfo(color) {
+  nodeColor = '#'+color;
+  graph.updateColor(nodeColor);
+  graph.renderGraph(context);
+}
+
+function updateTxt(color) {
+  txtColor = '#'+color;
+  graph.renderGraph(context);
+}
+
+// Courtesy of http://webhole.net/2010/04/24/html-5-slider-input-tutorial/
+function showValue(newValue)
+{
+	document.getElementById("range").innerHTML=newValue;
+	zoomFactor = newValue;
+	radius = canvasWidth/20*(1+zoomFactor/100);
+	graph.renderGraph(context);
+}
+
+'use strict';
+// Copyright Patrick Horgan patrick at dbp-consulting dot com
+// Permission to use granted as long as you keep this notice intact
+// use strict is everywhere because some browsers still don't support
+// using it once for the whole file and need per method/function
+// use.
+// Part is derivitive of work by Juan Mendes as noted below as appropriate.
+// Some things depend on code in http://dbp-consulting/scripts/utilities.js
+// Source: http://dbp-consulting.com/scripts/canvasutilities.js
+var drawLineAngle=function(ctx,x0,y0,angle,length)
+{
+    ctx.save();
+    ctx.moveTo(x0,y0);
+    ctx.lineTo(x0+length*Math.cos(angle),y0+length*Math.sin(angle));
+    ctx.stroke();
+    ctx.restore();
+}
+      
+var drawHead=function(ctx,x0,y0,x1,y1,x2,y2,style)
+{
+  'use strict';
+  if(typeof(x0)=='string') x0=parseInt(x0);
+  if(typeof(y0)=='string') y0=parseInt(y0);
+  if(typeof(x1)=='string') x1=parseInt(x1);
+  if(typeof(y1)=='string') y1=parseInt(y1);
+  if(typeof(x2)=='string') x2=parseInt(x2);
+  if(typeof(y2)=='string') y2=parseInt(y2);
+  var radius=3;
+  var twoPI=2*Math.PI;
+
+  // all cases do this.
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(x0,y0);
+  ctx.lineTo(x1,y1);
+  ctx.lineTo(x2,y2);
+  switch(style){
+    case 0:
+      // curved filled, add the bottom as an arcTo curve and fill
+      var backdist=Math.sqrt(((x2-x0)*(x2-x0))+((y2-y0)*(y2-y0)));
+      ctx.arcTo(x1,y1,x0,y0,.55*backdist);
+      ctx.fill();
+      break;
+    case 1:
+      // straight filled, add the bottom as a line and fill.
+      ctx.beginPath();
+      ctx.moveTo(x0,y0);
+      ctx.lineTo(x1,y1);
+      ctx.lineTo(x2,y2);
+      ctx.lineTo(x0,y0);
+      ctx.fill();
+      break;
+    case 2:
+      // unfilled head, just stroke.
+      ctx.stroke();
+      break;
+    case 3:
+      //filled head, add the bottom as a quadraticCurveTo curve and fill
+      var cpx=(x0+x1+x2)/3;
+      var cpy=(y0+y1+y2)/3;
+      ctx.quadraticCurveTo(cpx,cpy,x0,y0);
+      ctx.fill();
+      break;
+    case 4:
+      //filled head, add the bottom as a bezierCurveTo curve and fill
+      var cp1x, cp1y, cp2x, cp2y,backdist;
+      var shiftamt=5;
+      if(x2==x0){
+	// Avoid a divide by zero if x2==x0
+	backdist=y2-y0;
+	cp1x=(x1+x0)/2;
+	cp2x=(x1+x0)/2;
+	cp1y=y1+backdist/shiftamt;
+	cp2y=y1-backdist/shiftamt;
+      }else{
+	backdist=Math.sqrt(((x2-x0)*(x2-x0))+((y2-y0)*(y2-y0)));
+	var xback=(x0+x2)/2;
+	var yback=(y0+y2)/2;
+	var xmid=(xback+x1)/2;
+	var ymid=(yback+y1)/2;
+
+	var m=(y2-y0)/(x2-x0);
+	var dx=(backdist/(2*Math.sqrt(m*m+1)))/shiftamt;
+	var dy=m*dx;
+	cp1x=xmid-dx;
+	cp1y=ymid-dy;
+	cp2x=xmid+dx;
+	cp2y=ymid+dy;
+      }
+
+      ctx.bezierCurveTo(cp1x,cp1y,cp2x,cp2y,x0,y0);
+      ctx.fill();
+      break;
+  }
+  ctx.restore();
+};
+
+var drawArcedArrow=function(ctx,x,y,r,startangle,endangle,anticlockwise,style,which,angle,d)
+{
+    'use strict';
+    style=typeof(style)!='undefined'? style:3;
+    which=typeof(which)!='undefined'? which:1; // end point gets arrow
+    angle=typeof(angle)!='undefined'? angle:Math.PI/8;
+    d    =typeof(d)    !='undefined'? d    :10;
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(x,y,r,startangle,endangle,anticlockwise);
+    ctx.stroke();
+    var sx,sy,lineangle,destx,desty;
+    ctx.strokeStyle='rgba(0,0,0,0)';	// don't show the shaft
+    if(which&1){	    // draw the destination end
+	sx=Math.cos(startangle)*r+x;
+	sy=Math.sin(startangle)*r+y;
+	lineangle=Math.atan2(x-sx,sy-y);
+	if(anticlockwise){
+	    destx=sx+10*Math.cos(lineangle);
+	    desty=sy+10*Math.sin(lineangle);
+	}else{
+	    destx=sx-10*Math.cos(lineangle);
+	    desty=sy-10*Math.sin(lineangle);
+	}
+	drawArrow(ctx,sx,sy,destx,desty,style,2,angle,d);
+    }
+    if(which&2){	    // draw the origination end
+	sx=Math.cos(endangle)*r+x;
+	sy=Math.sin(endangle)*r+y;
+	lineangle=Math.atan2(x-sx,sy-y);
+	if(anticlockwise){
+	    destx=sx-10*Math.cos(lineangle);
+	    desty=sy-10*Math.sin(lineangle);
+	}else{
+	    destx=sx+10*Math.cos(lineangle);
+	    desty=sy+10*Math.sin(lineangle);
+	}
+	drawArrow(ctx,sx,sy,destx,desty,style,2,angle,d);
+    }
+    ctx.restore();
+}
+
+var drawArrow=function(ctx,x1,y1,x2,y2,style,which,angle,d)
+{
+  'use strict';
+  // Ceason pointed to a problem when x1 or y1 were a string, and concatenation
+  // would happen instead of addition
+  if(typeof(x1)=='string') x1=parseInt(x1);
+  if(typeof(y1)=='string') y1=parseInt(y1);
+  if(typeof(x2)=='string') x2=parseInt(x2);
+  if(typeof(y2)=='string') y2=parseInt(y2);
+  style=typeof(style)!='undefined'? style:3;
+  which=typeof(which)!='undefined'? which:1; // end point gets arrow
+  angle=typeof(angle)!='undefined'? angle:Math.PI/8;
+  d    =typeof(d)    !='undefined'? d    :10;
+  // default to using drawHead to draw the head, but if the style
+  // argument is a function, use it instead
+  var toDrawHead=typeof(style)!='function'?drawHead:style;
+
+  // For ends with arrow we actually want to stop before we get to the arrow
+  // so that wide lines won't put a flat end on the arrow.
+  //
+  var dist=Math.sqrt((x2-x1)*(x2-x1)+(y2-y1)*(y2-y1));
+  var ratio=(dist-d/3)/dist;
+  var tox, toy,fromx,fromy;
+  if(which&1){
+    tox=Math.round(x1+(x2-x1)*ratio);
+    toy=Math.round(y1+(y2-y1)*ratio);
+  }else{
+    tox=x2;
+    toy=y2;
+  }
+  if(which&2){
+    fromx=x1+(x2-x1)*(1-ratio);
+    fromy=y1+(y2-y1)*(1-ratio);
+  }else{
+    fromx=x1;
+    fromy=y1;
+  }
+
+  // Draw the shaft of the arrow
+  ctx.beginPath();
+  ctx.moveTo(fromx,fromy);
+  ctx.lineTo(tox,toy);
+  ctx.stroke();
+
+  // calculate the angle of the line
+  var lineangle=Math.atan2(y2-y1,x2-x1);
+  // h is the line length of a side of the arrow head
+  var h=Math.abs(d/Math.cos(angle));
+
+  if(which&1){	// handle far end arrow head
+    var angle1=lineangle+Math.PI+angle;
+    var topx=x2+Math.cos(angle1)*h;
+    var topy=y2+Math.sin(angle1)*h;
+    var angle2=lineangle+Math.PI-angle;
+    var botx=x2+Math.cos(angle2)*h;
+    var boty=y2+Math.sin(angle2)*h;
+    toDrawHead(ctx,topx,topy,x2,y2,botx,boty,style);
+  }
+  if(which&2){ // handle near end arrow head
+    var angle1=lineangle+angle;
+    var topx=x1+Math.cos(angle1)*h;
+    var topy=y1+Math.sin(angle1)*h;
+    var angle2=lineangle-angle;
+    var botx=x1+Math.cos(angle2)*h;
+    var boty=y1+Math.sin(angle2)*h;
+    toDrawHead(ctx,topx,topy,x1,y1,botx,boty,style);
+  }
+}
+</script>
+</body>
+</html>

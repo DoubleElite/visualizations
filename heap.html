@@ -1,0 +1,362 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<html> <head>
+<title></title>
+<style>
+body {
+margin: 0px;
+padding: 0px;
+}
+div.container
+{
+width:100%;
+margin:0px;
+border:1px solid gray;
+line-height:150%;
+}
+div.innercontainer
+{
+ width:100%;
+ margin:0px;
+ position:relative;
+}
+div.header,div.footer
+{
+padding:0.1em;
+color:white;
+background-color:gray;
+clear:left;
+}
+h1.header
+{
+padding:0;
+margin:0;
+}
+div.left
+{
+ position:absolute;
+ left:0;
+ top:0;
+ width:150px;
+ margin:0;
+ padding:1em;
+ background-color:lightgray;
+
+}
+div.content
+{
+ padding:0;
+ position:absolute;
+ left:180;
+ top:0;
+}
+</style>
+<script type="text/javascript" src="jscolor/jscolor.js"></script>
+<script type="text/javascript" src="./bintree/treecore.js"></script>
+<script type="text/javascript" src="./bintree/bintreeviz.js"></script>
+</head>
+
+<body>
+<div clas="innercontainer">
+<div class="left" id="controlPanel">
+<h3 align="center">Control Panel</h3><hr>
+<h4 align="center">
+
+<a onMouseover="document.getElementById('buttonimg').src=eval('ir_cacheonimg.src')"
+ onMouseout="document.getElementById('buttonimg').src=eval('ir_cacheoffimg.src')"
+ onclick="insertRandom()">
+<img src="./buttons/button_0.png" id="buttonimg" alt="Insert random"/></a>
+<p>
+<a onMouseover="document.getElementById('rt_buttonimg').src=eval('rt_cacheonimg.src')"
+ onMouseout="document.getElementById('rt_buttonimg').src=eval('rt_cacheoffimg.src')"
+ onclick="removeTop()">
+<img src="./buttons/button_remove0.png" id="rt_buttonimg" alt="Remove top"/></a>
+<p>
+<a onMouseover="document.getElementById('cl_buttonimg').src=eval('cl_cacheonimg.src')"
+ onMouseout="document.getElementById('cl_buttonimg').src=eval('cl_cacheoffimg.src')"
+ onclick="clearHeap()">
+<img src="./buttons/button_clear0.png" id="cl_buttonimg" alt="Clear heap"/></a>
+
+<FORM NAME="myform" ACTION="" METHOD="GET">Insert Value: <BR>
+<INPUT TYPE="text" id='insertvalue' NAME="insertvalue" VALUE=""><P>
+<a onMouseover="document.getElementById('in_buttonimg').src=eval('in_cacheonimg.src')"
+ onMouseout="document.getElementById('in_buttonimg').src=eval('in_cacheoffimg.src')"
+ onClick="insertValue(document.getElementById('insertvalue').form)">
+<img src="./buttons/button_insert0.png" id="in_buttonimg" alt="Insert Value"/></a>
+</FORM>
+min <INPUT TYPE="radio" NAME="heaptype" VALUE="min" checked onClick="setMin()">
+max <INPUT TYPE="radio" NAME="heaptype" VALUE="max" onClick="setMax()">
+</h4>
+
+<hr>
+  Node Color: <input value="8090A0" class="color {onImmediateChange:'updateInfo(this);'}">
+  Node Text Color: <input value="000000" class="color {onImmediateChange:'updateTxt(this);'}"><p>
+  Zoom:
+  <input type="range" min="-50" max="50" value="0" step="1" onchange="showValue(this.value)" />
+<span id="range">0</span>
+<h3 align="center">
+<a title="Click 'Insert Random' to add a random valueto the heap&#10;Click 'Remove Top' to remove the top of the heap&#10;Click 'Clear' to remove all items from heap.&#10Type in the box and press 'Insert' to add your own value to the heap&#10;Use the radio buttons to toggle between max and min heaps.&#10;" href='./heaphelp.html' target="_blank"><img width=35 src="./buttons/Help-icon.png"></a></h3>
+</div>
+<div class="content" id="myContent">
+<canvas id="myCanvas" tabindex="0"></canvas>
+</div>
+</div>
+
+
+<script>
+// To do:
+//   User input and submit
+//   Toggle between min and max
+//   Fix remove top of heap when only one element remaining.
+
+var ir_cacheonimg = new Image ();
+var ir_cacheoffimg = new Image ();
+ir_cacheonimg.src = './buttons/button_1.png';
+ir_cacheoffimg.src = './buttons/button_0.png';
+var rt_cacheonimg = new Image ();
+var rt_cacheoffimg = new Image ();
+rt_cacheonimg.src = './buttons/button_remove1.png';
+rt_cacheoffimg.src = './buttons/button_remove0.png';
+var in_cacheonimg = new Image ();
+var in_cacheoffimg = new Image ();
+in_cacheonimg.src = './buttons/button_insert1.png';
+in_cacheoffimg.src = './buttons/button_insert0.png';
+var cl_cacheonimg = new Image ();
+var cl_cacheoffimg = new Image ();
+cl_cacheonimg.src = './buttons/button_clear1.png';
+cl_cacheoffimg.src = './buttons/button_clear0.png';
+
+/**
+ Main tree functionality in treecore.js
+ Add functionality for our graphical binary tree implementation.
+ Core vizualization code is in bintreeviz.js
+ We will build our heap on top of the binary tree
+*/
+
+  // A heap is-a binary tree, so set that up here:
+  // http://stackoverflow.com/questions/8696695/composition-inheritance-and-aggregation-in-javascript
+function Heap(){
+this.lastNode = undefined;
+
+// Simply using a reference-based binary tree implementation
+// is a pain for heaps because we are always removing or adding
+// to the tree at the last position in terms of a breadth-first
+// traversal.  This much easier with an array.  So, we are going
+// to keep an array of our tree nodes in addition to the tree-structure/
+// This is a bit redundant, but we use the tree implementation we already
+// have to handle the display for us.
+this.nodeArray = new Array();
+
+// We are going to allow either minheaps (minHeap = true) or
+// maxheaps (minHeap = false).  Allow the user to change the heaptype.
+this.minHeap = true;
+
+// Current number of values in the heap.
+this.size = 0;
+}
+
+// Find out where the %*$& this is from and add a link
+Heap.prototype = new BinaryTree();
+Heap.prototype.constructor = BinaryTree;
+// This will remove the max or min value from the heap dependent on
+// the minHeap value.  Basically, we return the value of the root
+Heap.prototype.delete = function() {
+  var lastnode = this.nodeArray[this.size - 1];
+  var returnval = this.nodeArray[0].data1;
+  this.nodeArray[0].data1 = lastnode.data1;
+  this.deleteNode(lastnode);
+  this.nodeArray.pop();
+  this.size--;
+  this.heapifyDown(this.nodeArray[0]);
+  this.displayTree(context);
+  return returnval;
+}
+
+// This will insert a new value into the heap.  The value is added
+// to the array, then added to the underlying tree structure, then
+// we run heapify, and display the tree.
+Heap.prototype.insert = function(value) {
+  var newnode = new TreeData(value);
+  newnode.color = nodeColor;
+  this.nodeArray.push(newnode);
+  this.size++;
+  var position = this.size - 1;
+  if (this.size > 1) {
+    var parent = this.nodeArray[Math.ceil((position)/2) - 1];
+    if (position % 2 == 0) {
+      this.makeright(parent,newnode); }
+    else {
+      this.makeleft(parent,newnode); }
+  }
+  else {
+    this.tree = newnode;
+  }
+  this.heapifyUp(newnode);
+  this.displayTree(context);
+}
+
+Heap.prototype.compare = function(a, b) {
+  if (this.minHeap) return a < b;
+  return a > b;
+}
+
+Heap.prototype.heapifyUp = function(node) {
+  parent = node.parent;
+  if (parent == null) return;
+  if (!this.compare(parent.data1,node.data1)) {
+    var temp = parent.data1;
+    parent.data1 = node.data1;
+    node.data1 = temp;
+    this.heapifyUp(parent);
+  }
+  return;
+}
+
+Heap.prototype.heapifyDown = function(node) {
+  if (!node) return;
+  lchild = node.children[0];
+  rchild = node.children[1];
+  var swapnode = undefined;
+  // If there is no left child we are at a leaf, so return
+  if (!lchild) return;
+  // If there is a right child and a left child we need to pick which
+  // side to swap with.
+  if (lchild && rchild) {
+    if (this.compare(lchild.data1,rchild.data1)) {
+      swapnode = lchild; }
+    else {
+      swapnode = rchild; }
+  }
+  // Only a left child available
+  else { swapnode = lchild; }
+
+  if (!this.compare(node.data1,swapnode.data1)) {
+    var temp = node.data1;
+    node.data1 = swapnode.data1;
+    swapnode.data1 = temp;
+    this.heapifyDown(swapnode);
+  }
+  return;
+}
+
+var nodeColor = "#8090A0";
+var txtColor = "#000000";
+
+function updateInfo(color) {
+  nodeColor = '#'+color;
+  colorAllNodes();
+  tree.displayTree(context);
+}
+
+function updateTxt(color) {
+  txtColor = '#'+color;
+  tree.displayTree(context);
+}
+
+function colorAllNodes() {
+  for(var cur=tree.nextPost(0);cur;cur=tree.nextPost())
+    {
+      cur.color = nodeColor;
+    }
+}
+
+var myheap = new Heap();
+var tempHeap;
+var canvas = document.getElementById('myCanvas');
+var canvasWidth;// = window.innerWidth *.95;
+var canvasHeight;// = window.innerHeight *.95;
+var zoomFactor = 0;
+var context;// = window.ctx;
+
+window.onload = window.onresize = function() {
+  var C = .95;
+  
+  var windowHeight = window.innerHeight;
+  var windowWidth = window.innerWidth;
+ 
+  //document.getElementById('myContent').setAttribute("style","display:block;height:"+
+  //						    windowHeight - 100);
+  //document.getElementById('myContent').setAttribute("style","display:block;width:"+
+  //						    windowWidth - 140);
+  canvasWidth = (windowWidth-140) * C;
+  canvasHeight = windowHeight * C;
+  canvas.setAttribute("width", canvasWidth);
+  canvas.setAttribute("height", canvasHeight);
+  window.ctx = canvas.getContext("2d");
+  context = window.ctx;
+  myheap.displayTree(context);
+  return;
+};
+
+function insertRandom() {
+  myheap.insert(Math.floor(Math.random()*1000));
+  myheap.displayTree(context);
+};
+
+function removeTop() {
+  var returnval = myheap.delete();
+};
+
+// Courtesy of http://webhole.net/2010/04/24/html-5-slider-input-tutorial/
+function showValue(newValue)
+{
+	document.getElementById("range").innerHTML=newValue;
+	zoomFactor = newValue;
+	myheap.displayTree(context);
+}
+
+function updateInfo(color) {
+  nodeColor = '#'+color;
+  colorAllNodes();
+  myheap.displayTree(context);
+}
+
+function updateTxt(color) {
+  txtColor = '#'+color;
+  myheap.displayTree(context);
+}
+
+function colorAllNodes() {
+  for(var cur=myheap.nextPost(0);cur;cur=myheap.nextPost())
+    {
+      cur.color = nodeColor;
+    }
+}
+
+function insertValue (form) {
+    var TestVar = form.insertvalue.value;
+    myheap.insert(TestVar);
+}
+
+/****************
+ * Assume the user changes from a minheap to a maxheap or vice versa
+ * This code copies the data into a new heap with the correct min/max setting
+ ****************/
+function swapHeap() {
+  tempHeap = new Heap();
+  tempHeap.minHeap = myheap.minHeap;
+  while(myheap.size > 0) {
+    var retVal = myheap.delete();
+    tempHeap.insert(retVal);
+  }
+  myheap = tempHeap;
+  myheap.displayTree(context);
+}
+
+function setMax() {
+  myheap.minHeap = false;
+  swapHeap();
+}
+
+function setMin() {
+  myheap.minHeap = true;
+  swapHeap();
+}
+
+function clearHeap() {
+  myheap = new Heap();
+  myheap.displayTree(context);
+}
+
+</script>
+</body>
+</html>

@@ -1,0 +1,420 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<html> <head>
+<title></title>
+<style>
+body {
+margin: 0px;
+padding: 0px;
+}
+div.container
+{
+width:100%;
+margin:0px;
+border:1px solid gray;
+line-height:150%;
+}
+div.innercontainer
+{
+ width:100%;
+ margin:0px;
+ position:relative;
+}
+div.header,div.footer
+{
+padding:0.1em;
+color:white;
+background-color:gray;
+clear:left;
+}
+h1.header
+{
+padding:0;
+margin:0;
+}
+div.left
+{
+ position:absolute;
+ left:0;
+ top:0;
+ width:140px;
+ margin:0;
+ padding:1em;
+ background-color:lightgray;
+
+}
+div.content
+{
+ padding:0;
+ position:absolute;
+ left:180;
+ top:0;
+}
+</style>
+<script type="text/javascript" src="jscolor/jscolor.js"></script>
+<script type="text/javascript" src="./bintree/treecore.js"></script>
+<script type="text/javascript" src="./bintree/bintreeviz.js"></script>
+</head>
+
+<body>
+<div clas="innercontainer">
+<div class="left" id="controlPanel">
+<h3 align="center">Control Panel</h3>
+  <h4 align="center">
+Traversals<p>
+  <a onMouseover="document.getElementById('post_buttonimg').src=eval('post_cacheonimg.src')"
+  onMouseout="document.getElementById('post_buttonimg').src=eval('post_cacheoffimg.src')"
+  onclick="showPostorder()">
+  <img src="./buttons/button_postorder0.png" id="post_buttonimg" alt="Postorder"/></a>
+  <p>
+
+   <a onMouseover="document.getElementById('in_buttonimg').src=eval('in_cacheonimg.src')"
+  onMouseout="document.getElementById('in_buttonimg').src=eval('in_cacheoffimg.src')"
+  onclick="showInorder()">
+  <img src="./buttons/button_inorder0.png" id="in_buttonimg" alt="Inorder"/></a>
+  <p>
+
+   <a onMouseover="document.getElementById('pre_buttonimg').src=eval('pre_cacheonimg.src')"
+  onMouseout="document.getElementById('pre_buttonimg').src=eval('pre_cacheoffimg.src')"
+  onclick="showPreorder()">
+  <img src="./buttons/button_preorder0.png" id="pre_buttonimg" alt="Preorder"/></a>
+  <p>
+<hr>
+  <a onMouseover="document.getElementById('cl_buttonimg').src=eval('cl_cacheonimg.src')"
+  onMouseout="document.getElementById('cl_buttonimg').src=eval('cl_cacheoffimg.src')"
+  onclick="clearTree()">
+  <img src="./buttons/button_clear0.png" id="cl_buttonimg" alt="Clear heap"/></a>
+  
+<hr>
+  Node Color: <input value="8090A0" class="color {onImmediateChange:'updateInfo(this);'}">
+  Node Text Color: <input value="000000" class="color {onImmediateChange:'updateTxt(this);'}"><p>
+  Zoom:
+  <input type="range" min="-50" max="50" value="0" step="1" onchange="showValue(this.value)" />
+<span id="range">0</span>
+<h3 align="center">
+<a title="Click a node to highlight it.&#10;  Clicking a highlighted node deletes it and its children&#10;  Start typing when a node is highlighted to change its label.  Hit Enter or click a blank area when done.&#10;Click a node a drag down to the left to add a left child.&#10;Click a node and drag down the to the right to add a right child." href='./treehelp.html' target="_blank"><img width=35 src="./buttons/Help-icon.png"></a></h3>
+</div>
+<div class="content" id="myContent">
+<canvas id="myCanvas" tabindex="0"></canvas>
+</div>
+</div>
+
+
+<script>
+var post_cacheonimg = new Image ();
+var post_cacheoffimg = new Image ();
+post_cacheonimg.src = './buttons/button_postorder1.png';
+post_cacheoffimg.src = './buttons/button_postorder0.png';
+var in_cacheonimg = new Image ();
+var in_cacheoffimg = new Image ();
+in_cacheonimg.src = './buttons/button_inorder1.png';
+in_cacheoffimg.src = './buttons/button_inorder0.png';
+var pre_cacheonimg = new Image ();
+var pre_cacheoffimg = new Image ();
+pre_cacheonimg.src = './buttons/button_preorder1.png';
+pre_cacheoffimg.src = './buttons/button_preorder0.png';
+var cl_cacheonimg = new Image ();
+var cl_cacheoffimg = new Image ();
+cl_cacheonimg.src = './buttons/button_clear1.png';
+cl_cacheoffimg.src = './buttons/button_clear0.png';
+
+/**
+ Main tree functionality in treecore.js
+ Add functionality for our graphical binary tree implementation.
+ Core vizualization code is in bintreeviz.js
+ We add on the UI and other things we want to do here.
+*/
+
+// Handle left-clicks in the canvas. Here is how it works:
+// Any left click in empty space does nothing.
+// A left click (mouse up and down) on a node highlights the node:
+//   A second left click on the same node deletes the node
+//   Typing while a node is highlighted allows a label change for the node
+// A left-click on a node and a drag to the lower left, creates a left child
+// A left-click on a node and a drag to the lower right, creates a right child
+
+// firstClickedNode is set to the node that has been clicked once.
+var firstClickedNode;
+var typing;
+BinaryTree.prototype.leftClick = function(x,y) {
+  var clickedNode = this.findNode(x,y);
+  if (!clickedNode) {
+    // Unoccuppied space was clicked
+    if (firstClickedNode) {
+      // Unhighlight node and reset firstClickedNode to undefined
+      // That is no node is now currently highlighted or clicked.
+      typing = false;
+      firstClickedNode.color = nodeColor;
+      firstClickedNode = undefined;
+      return;      
+    }
+  }
+  // A node was clicked
+  else {
+    // A node had alread been selected
+    if (firstClickedNode)
+      {
+	// If a node had already been clicked and it is the same node, delete it
+	if (clickedNode == firstClickedNode) {
+	  tree.deleteNode(firstClickedNode);
+	  typing = false;
+	  firstClickedNode = undefined;
+	  return;
+	}
+	// else it was a different node so unhighlight and select new node
+	else { 
+	  firstClickedNode.color = nodeColor;
+	  firstClickedNode = clickedNode;
+	  typing = false;
+	  tree.highlight(clickedNode);
+	  return;
+	}
+      }
+    // This is a first click of this node, so highlight it.
+    else {
+      firstClickedNode = clickedNode;
+      tree.highlight(firstClickedNode);
+      return;
+    }
+  }
+}
+
+// Displays a post-order traversal of the tree in an alert box.
+// This could be made more fancy.  
+function showPostorder() {
+  var count = 0;
+  output = "Post-order traversal: ";
+  for(var cur=tree.nextPost(0);cur;cur=tree.nextPost())
+    {
+      output += cur.data1 + ", ";
+      //cur.data1 = count++;
+    }
+  alert(output);
+  // The following line can be uncommented if you want to change the data
+  // of each node to display it's position in the post-order traversal.
+  //tree.displayTree(context);
+}
+
+// Displays an in-order traversal of the tree in an alert box.
+// This could be made more fancy. 
+function showInorder() {
+  var count = 0;
+  var output = "In-order traversal: ";
+  for(var cur=tree.nextIn(0);cur;cur=tree.nextIn())
+    {
+      output += cur.data1 + ", ";
+      //cur.data1 = count++;
+    }
+  alert(output);
+  //tree.displayTree(context);
+}
+
+// Displays an pre-order traversal of the tree in an alert box.
+// This could be made more fancy. 
+function showPreorder() {
+  var count = 0;
+  output = "Pre-order traversal: ";
+  for(var cur=tree.nextPre(0);cur;cur=tree.nextPre())
+    {
+      output += cur.data1 + ", ";
+      //cur.data1 = count++;
+    }
+  alert(output);
+  //tree.displayTree(context);
+}
+
+var myEl = document.getElementById('myCanvas');
+
+function relMouseCoords(event){
+    var totalOffsetX = 0;
+    var totalOffsetY = 0;
+    var canvasX = 0;
+    var canvasY = 0;
+    var currentElement = this;
+
+    do{
+        totalOffsetX += currentElement.offsetLeft - currentElement.scrollLeft;
+        totalOffsetY += currentElement.offsetTop - currentElement.scrollTop;
+    }
+    while(currentElement = currentElement.offsetParent)
+
+    canvasX = event.pageX - totalOffsetX;
+    canvasY = event.pageY - totalOffsetY;
+
+    return {x:canvasX, y:canvasY}
+}
+HTMLCanvasElement.prototype.relMouseCoords = relMouseCoords;
+
+window.onload = window.onresize = function() {
+  var C = .95;
+  
+  var windowHeight = window.innerHeight;
+  var windowWidth = window.innerWidth;
+ 
+  //document.getElementById('myContent').setAttribute("style","display:block;height:"+
+  //						    windowHeight - 100);
+  //document.getElementById('myContent').setAttribute("style","display:block;width:"+
+  //						    windowWidth - 140);
+  canvasWidth = (windowWidth-140) * C;
+  canvasHeight = windowHeight * C;
+  canvas.setAttribute("width", canvasWidth);
+  canvas.setAttribute("height", canvasHeight);
+  window.ctx = canvas.getContext("2d");
+  context = window.ctx;
+  tree.displayTree(context);
+  return;
+};
+
+// New left-click dominant behavior goes here.  Get rid of right-click and menus.
+var dragging = false;
+var selection = null;
+var initialX = 0;
+var initialY = 0;
+var canvas = document.getElementById('myCanvas');
+
+//fixes a problem where double clicking causes text to get selected on the canvas
+canvas.addEventListener('selectstart', function(e) { e.preventDefault(); return false; }, false);
+canvas.addEventListener('mousedown', function(e) {
+    var coords = canvas.relMouseCoords(e);
+    var canvasX = coords.x;
+    var canvasY = coords.y;
+    initialX = canvasX;
+    initialY = canvasY;
+    var clickedNode = tree.findNode(canvasX,canvasY);
+    if (clickedNode) {
+      selection = clickedNode;
+      dragging = true;
+    }
+    else {
+      selection = null;
+      dragging = false;
+    }
+    tree.displayTree(context);
+  }, false);
+
+//canvas.addEventListener('mousemove',function(e) {
+//    if (dragging) {
+//      var coords = canvas.relMouseCoords(e);
+//      var canvasX = coords.x;
+//      var canvasY = coords.y;
+//selection.centerX = canvasX - dragoffx;
+//selection.centerY = canvasY - dragoffy;
+//    }
+//    moved=true;
+//  }, false);
+
+canvas.addEventListener('mouseup', function(e) {
+    var coords = canvas.relMouseCoords(e);
+    var canvasX = coords.x;
+    var canvasY = coords.y;
+    if (dragging) {
+      var differenceX = canvasX - initialX;
+      var differenceY = canvasY - initialY;
+      // A drag to the lower right
+      if (differenceX > 3 && differenceY > 3) {
+	var newNode = new TreeData(0);
+	newNode.color = nodeColor;
+	tree.makeright(selection,newNode);
+	tree.displayTree(context);
+	selection = undefined;
+	dragging = false;
+	return
+      }
+      // A drag to the lower left)
+      if (differenceX < -3 && differenceY > 3) {
+	var newNode = new TreeData(0);
+	newNode.color = nodeColor;
+	tree.makeleft(selection,newNode);
+	tree.displayTree(context);
+	selection = undefined;
+	dragging = false;
+	return;
+      }
+      // Movement was non-minimal but not in the right direction so ignore
+      if (!(Math.abs(differenceX) <=3 && Math.abs(differenceY) <=3)) {
+	return;
+      }
+    }
+    // Not a dragging gesture so run the left-click code.
+    tree.leftClick(canvasX, canvasY);
+    tree.displayTree(context);
+  }, false);
+
+canvas.addEventListener('keypress', function(e) {
+    if (firstClickedNode) {
+      if (e.which == 13)
+	{
+	  typing = false;
+	  firstClickedNode.color = nodeColor;
+	  firstClickedNode = undefined;
+	}
+      else {
+	if (!typing) {
+	  firstClickedNode.data1 = String.fromCharCode(e.which);
+	  typing = true;
+	}
+	else {
+	  firstClickedNode.data1 += String.fromCharCode(e.which);
+	}
+      }
+    }
+
+    tree.displayTree(context);
+  }, false);
+
+function updateInfo(color) {
+  nodeColor = '#'+color;
+  colorAllNodes();
+  tree.displayTree(context);
+}
+
+function updateTxt(color) {
+  txtColor = '#'+color;
+  tree.displayTree(context);
+}
+
+function colorAllNodes() {
+  for(var cur=tree.nextPost(0);cur;cur=tree.nextPost())
+    {
+      cur.color = nodeColor;
+    }
+}
+
+function clearTree() {
+  node1 = new TreeData('A');
+  tree = new BinaryTree();
+  tree.tree = node1;
+  colorAllNodes();
+  tree.displayTree(context);
+ }
+
+var canvasWidth;// = window.innerWidth *.95;
+var canvasHeight;// = window.innerHeight *.95;
+var zoomFactor = -50;
+var context;// = window.ctx;
+
+// Set up some generic tree so users don't see a blank slate.
+var node1 = new TreeData('A');
+var node2 = new TreeData('B');
+var node3 = new TreeData('C');
+var node4 = new TreeData('D');
+var node5 = new TreeData('E');
+var node6 = new TreeData('F');
+var tree = new BinaryTree();
+
+tree.makeleft(node1,node2);
+tree.makeright(node1,node3);
+tree.makeright(node2,node4);
+tree.makeleft(node2,node5);
+tree.makeleft(node3,node6);
+colorAllNodes();
+
+// Courtesy of http://webhole.net/2010/04/24/html-5-slider-input-tutorial/
+function showValue(newValue)
+{
+	document.getElementById("range").innerHTML=newValue;
+	zoomFactor = newValue;
+	tree.displayTree(context);
+}
+</script>
+</body>
+</html>
